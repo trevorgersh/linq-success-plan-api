@@ -1,0 +1,111 @@
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  Header, Footer, AlignmentType, BorderStyle, WidthType, ShadingType,
+  VerticalAlign, PageNumber, TabStopType, TabStopPosition
+} = require('docx');
+
+const LINQ_BLUE   = "1B4F8A";
+const HEADER_GRAY = "F2F2F2";
+const MID_GRAY    = "CCCCCC";
+const WHITE       = "FFFFFF";
+
+const border = (color = MID_GRAY) => ({ style: BorderStyle.SINGLE, size: 1, color });
+const allBorders = (color = MID_GRAY) => ({ top: border(color), bottom: border(color), left: border(color), right: border(color) });
+
+function cell(text, opts = {}) {
+  const { width = 4680, bold = false, shade = null, color = "000000", size = 20, align = AlignmentType.LEFT, vAlign = VerticalAlign.CENTER, borders = allBorders(), italic = false } = opts;
+  return new TableCell({ borders, width: { size: width, type: WidthType.DXA }, shading: shade ? { fill: shade, type: ShadingType.CLEAR } : undefined, margins: { top: 80, bottom: 80, left: 140, right: 140 }, verticalAlign: vAlign, children: [new Paragraph({ alignment: align, children: [new TextRun({ text: String(text || ''), bold, color, size, font: "Arial", italic })] })] });
+}
+
+function headerCell(text, width = 4680) { return cell(text, { width, bold: true, shade: LINQ_BLUE, color: WHITE, size: 20 }); }
+function labelCell(text, width = 2340) { return cell(text, { width, bold: true, shade: HEADER_GRAY, size: 20 }); }
+function dataCell(text, width = 7020) { return cell(text, { width, size: 20 }); }
+
+function sectionHeading(text) {
+  return new Paragraph({ spacing: { before: 260, after: 80 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: LINQ_BLUE, space: 1 } }, children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 22, color: LINQ_BLUE, font: "Arial" })] });
+}
+
+function spacer() { return new Paragraph({ children: [new TextRun({ text: "", size: 18 })] }); }
+
+function buildDoc(data) {
+  const TW = 9360;
+  const children = [];
+
+  children.push(new Paragraph({ spacing: { before: 0, after: 60 }, children: [new TextRun({ text: "LINQ  ", bold: true, size: 32, color: LINQ_BLUE, font: "Arial" }), new TextRun({ text: "Partner Success Plan", size: 28, color: "444444", font: "Arial" }), new TextRun({ text: `\t${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, size: 20, color: "888888", font: "Arial" })], tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }], border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: LINQ_BLUE, space: 4 } } }), spacer());
+
+  children.push(sectionHeading("1. Client Snapshot"));
+  const COL = [1560, 3120, 1560, 3120];
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: COL, rows: [
+    new TableRow({ children: [labelCell("Company", COL[0]), dataCell(data.company || '', COL[1]), labelCell("Tier", COL[2]), dataCell(data.tier || '', COL[3])] }),
+    new TableRow({ children: [labelCell("Primary Contact", COL[0]), dataCell(data.primaryContact || '', COL[1]), labelCell("PSM", COL[2]), dataCell(data.psm || 'Trevor', COL[3])] }),
+    new TableRow({ children: [labelCell("Lines", COL[0]), dataCell(data.lines || '', COL[1]), labelCell("Potential Lines", COL[2]), dataCell(data.potentialLines || '', COL[3])] }),
+    new TableRow({ children: [labelCell("ARR", COL[0]), dataCell(data.arr || '', COL[1]), labelCell("Renewal", COL[2]), dataCell(data.renewal || '', COL[3])] }),
+  ]}), spacer());
+
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [1560, 7800], rows: [
+    new TableRow({ children: [labelCell("Use Case", 1560), dataCell(data.useCase || '', 7800)] }),
+    new TableRow({ children: [labelCell("Why iMessage", 1560), dataCell(data.whyIMessage || '', 7800)] }),
+  ]}), spacer());
+
+  children.push(sectionHeading("2. Goals & Milestones"));
+  const goals = data.goals || [];
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [1400, 3980, 3980], rows: [
+    new TableRow({ children: [headerCell("Period", 1400), headerCell("Client Goal", 3980), headerCell("Linq Role", 3980)] }),
+    ...goals.map(g => new TableRow({ children: [cell(g.period || '', { width: 1400, bold: true, shade: HEADER_GRAY, size: 19 }), cell(g.clientGoal || '', { width: 3980, size: 19 }), cell(g.linqRole || '', { width: 3980, size: 19 })] }))
+  ]}), spacer());
+
+  const milestones = data.milestones || [];
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [4460, 1900, 1500, 1500], rows: [
+    new TableRow({ children: [headerCell("Milestone", 4460), headerCell("Target", 1900), headerCell("Status", 1500), headerCell("Notes", 1500)] }),
+    ...milestones.map(m => new TableRow({ children: [cell(m.milestone || '', { width: 4460, size: 19 }), cell(m.target || '', { width: 1900, size: 19, align: AlignmentType.CENTER }), cell(m.status || '', { width: 1500, size: 19, align: AlignmentType.CENTER }), cell(m.notes || '', { width: 1500, size: 19 })] }))
+  ]}), spacer());
+
+  children.push(sectionHeading("3. Risks"));
+  const risks = data.risks || [];
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [900, 2700, 1100, 3060, 1600], rows: [
+    new TableRow({ children: [headerCell("Date", 900), headerCell("Risk", 2700), headerCell("Severity", 1100), headerCell("Mitigation", 3060), headerCell("Status", 1600)] }),
+    ...risks.map(r => { const sevColor = r.severity === "Critical" ? "C0392B" : r.severity === "High" ? "D35400" : "7D6608"; return new TableRow({ children: [cell(r.date || '', { width: 900, size: 18 }), cell(r.risk || '', { width: 2700, size: 18 }), cell(r.severity || '', { width: 1100, size: 18, bold: true, color: sevColor, align: AlignmentType.CENTER }), cell(r.mitigation || '', { width: 3060, size: 18 }), cell(r.status || 'Open', { width: 1600, size: 18, align: AlignmentType.CENTER })] }); })
+  ]}), spacer());
+
+  children.push(sectionHeading("4. Account Health Signals"));
+  const health = data.health || [];
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [2400, 2400, 2160, 2400], rows: [
+    new TableRow({ children: [headerCell("Signal", 2400), headerCell("Threshold", 2400), headerCell("Current", 2160), headerCell("Notes", 2400)] }),
+    ...health.map(h => new TableRow({ children: [cell(h.signal || '', { width: 2400, size: 18, bold: true }), cell(h.threshold || '', { width: 2400, size: 18 }), cell(h.current || '', { width: 2160, size: 18 }), cell(h.notes || '', { width: 2400, size: 18, italic: true, color: "555555" })] }))
+  ]}), spacer());
+
+  children.push(sectionHeading("5. Notes & Next Steps"));
+  const notes = data.notes || [];
+  const noteRows = [...notes];
+  while (noteRows.length < 5) noteRows.push({ date: '', summary: '', owner: '', nextStep: '' });
+  children.push(new Table({ width: { size: TW, type: WidthType.DXA }, columnWidths: [900, 4260, 1200, 3000], rows: [
+    new TableRow({ children: [headerCell("Date", 900), headerCell("Summary", 4260), headerCell("Owner", 1200), headerCell("Next Step", 3000)] }),
+    ...noteRows.map(n => new TableRow({ children: [cell(n.date || '', { width: 900, size: 18 }), cell(n.summary || '', { width: 4260, size: 18 }), cell(n.owner || '', { width: 1200, size: 18, align: AlignmentType.CENTER }), cell(n.nextStep || '', { width: 3000, size: 18 })] }))
+  ]}));
+
+  const footer = new Footer({ children: [new Paragraph({ children: [new TextRun({ text: `Linq Partner Success — ${data.company || 'Client'}  `, size: 16, color: "888888", font: "Arial" }), new TextRun({ text: "\tPage ", size: 16, color: "888888", font: "Arial" }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "888888", font: "Arial" })], tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }] })] });
+
+  return new Document({ styles: { default: { document: { run: { font: "Arial", size: 20 } } } }, sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } }, footers: { default: footer }, children }] });
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const data = req.body;
+    if (!data) return res.status(400).json({ error: 'No data provided' });
+    const doc = buildDoc(data);
+    const buffer = await Packer.toBuffer(doc);
+    const filename = `linq-success-plan-${(data.company || 'client').toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    return res.status(200).send(buffer);
+  } catch (error) {
+    console.error('Error generating docx:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
